@@ -5,7 +5,17 @@
 
 [TrailHead](https://trailhead.salesforce.com/home)
 
-## Batch Apex Challenge Code
+# [Developer Intermediate](https://trailhead.salesforce.com/en/content/learn/trails/force_com_dev_intermediate)
+
+
+
+## [Asynchronous Apex](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex?trail_id=force_com_dev_intermediate)
+
+[Use Future Methods](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex/async_apex_future_methods?trail_id=force_com_dev_intermediate)
+
+
+
+### [Use Batch Apex](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex/async_apex_batch?trail_id=force_com_dev_intermediate)
 
 ```java
 global class LeadProcessor implements Database.Batchable<SObject>{
