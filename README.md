@@ -210,10 +210,61 @@ public class UpdateParentAccountTest {
 - 在测试类中，为 BillingState“ NY”插入50个 Account 记录，为 BillingState“ CA”插入50个 Account 记录。创建 AddPrimaryContact 类的一个实例，对作业进行排队，并断言为每个50个帐户插入了带有“ CA”的 BillingState 的 Contact 记录
 
 ```java
-
+public class AddPrimaryContact implements Queueable{
+    private Contact c;
+    private String state;
+    public AddPrimaryContact(Contact c, String state)
+    {
+        this.c = c;
+        this.state = state;
+    }
+    public void execute(QueueableContext context) {
+        List<Account> ListAccount = [SELECT ID, Name ,
+                                     (Select id,FirstName,LastName from contacts ) 
+                                     FROM ACCOUNT 
+                                     WHERE BillingState = :state LIMIT 200];
+        List<Contact> lstContact = new List<Contact>();
+        for (Account acc:ListAccount)
+        {
+            Contact cont = c.clone(false,false,false,false);
+            cont.AccountId =  acc.id;
+            lstContact.add( cont );
+        }
+        
+        if(lstContact.size() >0 )
+        {
+            insert lstContact;
+        }
+    }
+}
 ```
 
 ```java
-
+@isTest
+public class AddPrimaryContactTest {
+    
+    @isTest static void testQueueable(){
+        //<-----@testSetup
+        List<Account> accounts = new List<Account>();
+        for (Integer i = 0; i < 50; i++){accounts.add(new Account(name = 'acc' + i, BillingState = 'NY')); }
+        for (Integer i = 50; i < 100; i++){accounts.add(new Account(name = 'acc' + i, BillingState = 'CA')); }
+        insert accounts;
+        
+        String strState = 'CA';
+        Contact cont = new Contact(LastName = 'TstsName');
+        AddPrimaryContact updater = new AddPrimaryContact(cont, strState);
+        //<-----@testSetup
+        
+        //<-----@testExecution
+        Test.startTest();
+        System.enqueueJob(updater);
+        Test.stopTest();
+        //<-----@testExecution
+        
+        //<-----@testResult
+        System.assertEquals(50, [select count() from Contact where accountID IN (SELECT id FROM Account WHERE BillingState = :strState)]);   
+        //<-----@testResult
+    }
+}
 ```
 
