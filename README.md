@@ -5,9 +5,9 @@
 
 [TrailHead](https://trailhead.salesforce.com/home)
 
+[TOC]
+
 # [Developer Intermediate](https://trailhead.salesforce.com/en/content/learn/trails/force_com_dev_intermediate)
-
-
 
 ## [Asynchronous Apex](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex?trail_id=force_com_dev_intermediate)
 
@@ -104,6 +104,8 @@ private class LeadProcessorTest {
     }
 }
 ```
+
+
 
 ### [Control Processes with Queueable Apex](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex/async_apex_queueable?trail_id=force_com_dev_intermediate)
 
@@ -264,6 +266,159 @@ public class AddPrimaryContactTest {
         //<-----@testResult
         System.assertEquals(50, [select count() from Contact where accountID IN (SELECT id FROM Account WHERE BillingState = :strState)]);   
         //<-----@testResult
+    }
+}
+```
+
+
+
+### [Schedule Jobs Using the Apex Scheduler](https://trailhead.salesforce.com/en/content/learn/modules/asynchronous_apex/async_apex_scheduled?trail_id=force_com_dev_intermediate)
+
+#### 🔖Scheduled Syntax
+
+要调用 Apex 类在特定时间运行，首先实现该类的 `schedable` 接口。然后，使用 `System.schedule` 方法安排类的实例在特定时间运行。
+
+```java
+global class SomeClass implements Schedulable {
+    global void execute(SchedulableContext ctx) {
+        // awesome code here
+    }
+}
+```
+
+该类实现`Schedulable`接口，并且必须实现该接口包含的唯一方法，即 `execute` 方法。
+
+此方法的参数是 `schedableecontext` 对象。在调度了一个类之后，将创建一个 `CronTrigger` 对象来表示调度的作业。它提供了一个 `getTriggerId` 方法，该方法返回 `CronTrigger` API 对象的 ID。
+
+#### 🔖Sample Code
+
+该类查询本应在当前日期前关闭的开放机会，并在每个机会上创建一个任务，以提醒所有者更新机会。
+
+```java
+global class RemindOpptyOwners implements Schedulable {
+    global void execute(SchedulableContext ctx) {
+        List<Opportunity> opptys = [SELECT Id, Name, OwnerId, CloseDate 
+                                    FROM Opportunity 
+                                    WHERE IsClosed = False AND 
+                                    CloseDate < TODAY];
+        // Create a task for each opportunity in the list
+        TaskUtils.remindOwners(opptys);
+    }
+    
+}
+```
+
+调用方法：
+
+```java
+RemindOpptyOwners reminder = new RemindOpptyOwners();
+// Seconds Minutes Hours Day_of_month Month Day_of_week optional_year
+String sch = '20 30 8 10 2 ?';
+String jobID = System.schedule('Remind Opp Owners', sch, reminder);
+```
+
+Schedule 方法有三个参数: 
+
+1. 作业的名称
+2. 用于表示计划运行作业的时间和日期的 CRON 表达式
+3. 类的名称。
+
+#### 🔖Testing Scheduled Apex
+
+```java
+@isTest
+private class RemindOppyOwnersTest {
+    // Dummy CRON expression: midnight on March 15.
+    // Because this is a test, job executes
+    // immediately after Test.stopTest().
+    public static String CRON_EXP = '0 0 0 15 3 ? 2022';
+    static testmethod void testScheduledJob() {
+        // Create some out of date Opportunity records
+        List<Opportunity> opptys = new List<Opportunity>();
+        Date closeDate = Date.today().addDays(-7);
+        for (Integer i=0; i<10; i++) {
+            Opportunity o = new Opportunity(
+                Name = 'Opportunity ' + i,
+                CloseDate = closeDate,
+                StageName = 'Prospecting'
+            );
+            opptys.add(o);
+        }
+        insert opptys;
+        
+        // Get the IDs of the opportunities we just inserted
+        Map<Id, Opportunity> opptyMap = new Map<Id, Opportunity>(opptys);
+        List<Id> opptyIds = new List<Id>(opptyMap.keySet());
+        Test.startTest();
+        // Schedule the test job
+        String jobId = System.schedule('ScheduledApexTest',
+            CRON_EXP, 
+            new RemindOpptyOwners());         
+        // Verify the scheduled job has not run yet.
+        List<Task> lt = [SELECT Id 
+            FROM Task 
+            WHERE WhatId IN :opptyIds];
+        System.assertEquals(0, lt.size(), 'Tasks exist before job has run');
+        // Stopping the test will run the job synchronously
+        Test.stopTest();
+        
+        // Now that the scheduled job has executed,
+        // check that our tasks were created
+        lt = [SELECT Id 
+            FROM Task 
+            WHERE WhatId IN :opptyIds];
+        System.assertEquals(opptyIds.size(), 
+            lt.size(), 
+            'Tasks were not created');
+    }
+}
+```
+
+#### 🎯Challenge
+
+创建一个实现可调度接口的 Apex 类，使用特定的 LeadSource 更新 Lead 记录。
+
+- 创建一个名为`DailyLeadProcessor`的 Apex 类，该类使用可调度接口
+-  Execute 方法必须找到带有空白 LeadSource 字段的前200个 Leads，并用 'Dreamforce'的 LeadSource 值更新它们
+- 创建一个名为 DailyLeadProcessorTest 的 Apex 测试类
+- 在测试类中，插入200 Lead 记录，安排 DailyLeadProcessor 类运行并测试所有 Lead 记录是否被正确更新
+
+```java
+global  class DailyLeadProcessor implements Schedulable {
+    global void execute(SchedulableContext ctx){
+        List<Lead> listLead = [Select Id, LeadSource 
+                               from Lead where LeadSource = null];
+        if (listLead.size()!=0) {
+            for(Lead l:listLead){
+                l.LeadSource='Dreamforce';
+            }
+            update listLead;
+        }
+        
+    }
+}
+```
+
+```java
+@isTest
+public  class DailyLeadProcessorTest {
+    public static String CRON_EXP = '0 0 1 * * ?';
+    static testmethod void testScheduledJob() {
+        // Create some out of date Lead records
+        List<Lead> Leads = new List<Lead>();
+        for (Integer i=0; i<200; i++) {
+            Lead l = new Lead(
+                Firstname = 'Lead' + i,
+                LastName= 'LastName' + i,
+                Company= 'TestCompany'
+            );
+            Leads.add(l);
+        }
+        insert Leads;
+        
+        Test.startTest();
+        String jobId = System.schedule('DailyLeadProcessor', CRON_EXP,new DailyLeadProcessor());
+        Test.stopTest();
     }
 }
 ```
