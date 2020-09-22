@@ -109,7 +109,7 @@ public with sharing class WarehouseCalloutService {
 }
 ```
 
-## **Schedule synchronization**
+## **3️⃣Schedule synchronization**
 
 ```java
 global class WarehouseSyncSchedule implements Schedulable{
@@ -120,7 +120,7 @@ global class WarehouseSyncSchedule implements Schedulable{
 }
 ```
 
-## 3️⃣Scheduling a Job from the UI
+### Scheduling a Job from the UI
 
 You can also schedule a class using the user interface.
 
