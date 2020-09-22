@@ -1,19 +1,19 @@
-# [Apex Specialist](https://trailhead.salesforce.com/en/content/learn/superbadges/superbadge_apex)
+# 🏆[Apex Specialist](https://trailhead.salesforce.com/en/content/learn/superbadges/superbadge_apex)
 
 ## 如何赚取此超级徽章
 
-1. 使用Apex触发器自动创建记录(Apex triggers)
-2. 使用异步REST标注将Salesforce数据与外部系统同步(REST callouts)
-3. 使用Apex代码安排同步(Schedule synchronization)
-4. 测试自动化逻辑以确认Apex触发副作用(Test automation logic)
-5. 使用标注模拟测试集成逻辑(Test integration logic)
-6. 测试调度逻辑以确认操作已排队(Test scheduling logic)
+1. 使用Apex触发器自动创建记录(`Apex triggers`)
+2. 使用异步REST标注将Salesforce数据与外部系统同步(`REST callouts`)
+3. 使用Apex代码安排同步(`Schedule synchronization`)
+4. 测试自动化逻辑以确认Apex触发副作用(`Test automation logic`)
+5. 使用标注模拟测试集成逻辑(`Test integration logic`)
+6. 测试调度逻辑以确认操作已排队(`Test scheduling logic`)
 
 ## 实体图
 
 ![Entity Diagram - Vehicle, Case, Work Part, Product](assets/c029d98dfdb478da2673ceb187a78fef_image_0.png)
 
-## Step1 **Automate record creation**
+## 1️⃣Step1 **Automate record creation**
 
 ```java
 trigger MaintenanceRequest on Case (before update, after update) {
@@ -66,7 +66,7 @@ public class MaintenanceRequestHelper {
 }
 ```
 
-## Step2 **Synchronize Salesforce data with an external system**
+## 2️⃣Step2 **Synchronize Salesforce data with an external system**
 
 ```java
 public with sharing class WarehouseCalloutService {
