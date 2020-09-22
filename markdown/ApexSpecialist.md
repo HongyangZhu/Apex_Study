@@ -19,49 +19,50 @@
 trigger MaintenanceRequest on Case (before update, after update) {
     // ToDo: Call MaintenanceRequestHelper.updateWorkOrders
     if(Trigger.isAfter && Trigger.isUpdate){
-        MaintenanceRequestHelper.updateWorkOrders();
+        MaintenanceRequestHelper.updateWorkOrders(Trigger.New);
     }
 }
 ```
 
 ```java
-public class MaintenanceRequestHelper { 
-    public static void updateWorkOrders(){
-        // update workorders
-        List<Case> insertCaseLst = new List<Case>();
-        List<Case> csList =  [select id,Vehicle__r.Id,Equipment__r.Id,(select id from Work_Parts__r) 
-                              from case 
-                              where status = 'Closed' 
-                              and Id IN :Trigger.new 
-                              and Type in('Repair','Routine Maintenance')];
-        System.debug('csList-->'+csList);
-        for(Case cs:csList){
-            List<Work_Part__c> workPartLst = cs.Work_Parts__r;
-            Case newCase = new Case(Type = 'Routine Maintenance', 
-                                    Subject = 'New Routine Maintenance',
-                                    Date_Reported__c = System.Today(), 
-                                    Date_Due__c = System.Today() + calculateDueDate(workPartLst),
-                                    Vehicle__c = cs.Vehicle__r.Id,Origin='Web',
-                                    Status='New',
-                                    Equipment__c = cs.Equipment__r.Id);
-            insertCaseLst.add(newCase);
-            
+public with sharing class MaintenanceRequestHelper {
+    public static void updateWorkOrders(List<Case> caseList) {
+        List<case> newCases = new List<Case>();
+        Map<String,Integer> result=getDueDate(caseList);
+        for(Case c : caseList){
+            if(c.status=='closed')
+                if(c.type=='Repair' || c.type=='Routine Maintenance'){
+                    Case newCase = new Case();
+                    newCase.Status='New';
+                    newCase.Origin='web';
+                    newCase.Type='Routine Maintenance';
+                    newCase.Subject='Routine Maintenance of Vehicle';
+                    newCase.Vehicle__c=c.Vehicle__c;
+                    newCase.Equipment__c=c.Equipment__c;
+                    newCase.Date_Reported__c=Date.today();
+                    if(result.get(c.Id)!=null)
+                        newCase.Date_Due__c=Date.today()+result.get(c.Id);
+                    else
+                        newCase.Date_Due__c=Date.today();
+                    newCases.add(newCase);
+                }
         }
-        if(insertCaseLst!=null && insertCaseLst.size()>0){
-            insert insertCaseLst;
-        } 
-    }  
-    
-    public static Integer calculateDueDate(List<Work_Part__c> workPartLst){
-        Integer count = 0;
-        List<AggregateResult> agrResult = [select min(Equipment__r.Maintenance_Cycle__c) arg 
-                                           from Work_Part__c 
-                                           where id in:workPartLst ];
-        for(AggregateResult ar : agrResult){
-            count = (Integer) ar.get('arg');
+        insert newCases;
+    }
+    //
+    public static  Map<String,Integer> getDueDate(List<case> CaseIDs){
+        Map<String,Integer> result = new Map<String,Integer>();
+        Map<Id, case> caseKeys = new Map<Id, case> (CaseIDs);
+        List<AggregateResult> wpc=[select Maintenance_Request__r.ID cID,min(Equipment__r.Maintenance_Cycle__c)cycle
+                                   from Work_Part__c where  Maintenance_Request__r.ID in :caseKeys.keySet() group by             Maintenance_Request__r.ID ];
+        for(AggregateResult res :wpc){
+            Integer addDays=0;
+            if(res.get('cycle')!=null)
+                addDays+=Integer.valueOf(res.get('cycle'));
+            result.put((String)res.get('cID'),addDays);
         }
-        return count !=null ? count : 0 ;
-    }      
+        return result;
+    }
     
 }
 ```
@@ -133,6 +134,74 @@ You can also schedule a class using the user interface.
 7. Click **Save**.
 
 ## 4️⃣**Test automation logic**
+
+```java
+@isTest
+public  class MaintenanceRequestTest {
+    static  List<Case> caseList1 = new List<Case>();
+    static List<Product2> prodList = new List<Product2>();
+    static List<Work_Part__c> wpList = new List<Work_Part__c>();
+    @testSetup
+    static void getData(){
+        caseList1= CreateData(300,3,3,'Repair');
+    }
+    
+    public static List<Case>   CreateData( Integer numOfcase, Integer numofProd, Integer numofVehicle,
+                                          String type){
+                                              List<Case> caseList = new List<Case>();
+                                              //Create Vehicle
+                                              Vehicle__c vc = new Vehicle__c();
+                                              vc.name='Test Vehicle';
+                                              upsert vc;
+                                              //Create Equiment
+                                              for(Integer i=0;i<numofProd;i++){
+                                                  Product2 prod = new Product2();
+                                                  prod.Name='Test Product'+i;
+                                                  if(i!=0)
+                                                      prod.Maintenance_Cycle__c=i;
+                                                  prod.Replacement_Part__c=true;
+                                                  prodList.add(prod);
+                                              }
+                                              upsert  prodlist;
+                                              //Create Case
+                                              for(Integer i=0;i< numOfcase;i++){
+                                                  Case newCase = new Case();
+                                                  newCase.Status='New';
+                                                  newCase.Origin='web';
+                                                  if( math.mod(i, 2) ==0)
+                                                      newCase.Type='Routine Maintenance';
+                                                  else
+                                                      newCase.Type='Repair';
+                                                  newCase.Subject='Routine Maintenance of Vehicle' +i;
+                                                  newCase.Vehicle__c=vc.Id;
+                                                  if(i<numofProd)
+                                                      newCase.Equipment__c=prodList.get(i).ID;
+                                                  else
+                                                      newCase.Equipment__c=prodList.get(0).ID;
+                                                  caseList.add(newCase);
+                                              }
+                                              upsert caseList;
+                                              for(Integer i=0;i<numofProd;i++){
+                                                  Work_Part__c wp = new Work_Part__c();
+                                                  wp.Equipment__c   =prodlist.get(i).Id   ;
+                                                  wp.Maintenance_Request__c=caseList.get(i).id;
+                                                  wplist.add(wp) ;
+                                              }
+                                              upsert wplist;
+                                              return caseList;
+                                          }
+    
+    public static testmethod void testMaintenanceHelper(){
+        Test.startTest();
+        getData();
+        for(Case cas: caseList1)
+            cas.Status ='Closed';
+        update caseList1;
+        Test.stopTest();
+    }
+    
+}
+```
 
 ## 5️⃣**Test callout logic**
 
