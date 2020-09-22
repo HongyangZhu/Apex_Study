@@ -109,3 +109,31 @@ public with sharing class WarehouseCalloutService {
 }
 ```
 
+## **Schedule synchronization**
+
+```java
+global class WarehouseSyncSchedule implements Schedulable{
+    // implement scheduled code here
+    global void execute(SchedulableContext ctx){
+        WarehouseCalloutService.runWarehouseEquipmentSync();
+    }
+}
+```
+
+## 3️⃣Scheduling a Job from the UI
+
+You can also schedule a class using the user interface.
+
+1. From Setup, enter Apex in the Quick Find box, then select **Apex Classes**.
+2. Click **Schedule Apex**.
+3. For the job name, enter something like Daily Oppty Reminder.
+4. Click the lookup button next to Apex class and enter * for the search term to get a list of all classes that can be scheduled. In the search results, click the name of your scheduled class.
+5. Select Weekly or Monthly for the frequency and set the frequency desired.
+6. Select the start and end dates, and a preferred start time.
+7. Click **Save**.
+
+## 4️⃣**Test automation logic**
+
+## 5️⃣**Test callout logic**
+
+## 5️⃣**Test scheduling logic**
